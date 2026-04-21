@@ -1,0 +1,44 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "User Profile",
+      "description": "Stores user budget settings and initial balance",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "initialBalance": { "type": "number" },
+        "monthlyLimit": { "type": "number" },
+        "currency": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "initialBalance", "monthlyLimit"]
+    },
+    "transaction": {
+      "title": "Transaction",
+      "description": "Individual expense or credit record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["credit", "debit"] },
+        "category": { "type": "string" },
+        "merchant": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "type", "category", "date"]
+    }
+  },
+  "firestore": {
+    "userProfiles/{userId}": {
+      "schema": "userProfile",
+      "description": "Metadata for each user"
+    },
+    "transactions/{transactionId}": {
+      "schema": "transaction",
+      "description": "Collection of user transactions"
+    }
+  }
+}

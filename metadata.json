@@ -1,0 +1,6 @@
+{
+  "name": "PennyWise AI",
+  "description": "AI-powered expense tracker that parses transaction screenshots, manages budgets, and generates spending reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
