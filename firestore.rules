@@ -12,8 +12,13 @@ service cloud.firestore {
       return request.auth != null;
     }
     
+    function isVerified() {
+      // In this environment, email_verified is mandatory for all non-public writes
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+    
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return isVerified() && request.auth.uid == userId;
     }
 
     function isValidId(id) {
@@ -50,7 +55,7 @@ service cloud.firestore {
         && data.merchant is string && data.merchant.size() <= 128
         && data.date is string && data.date.size() <= 64
         && data.description is string && data.description.size() <= 500
-        && data.createdAt is string; // Validated as string representation of ISO or request.time
+        && data.createdAt is string; 
     }
 
     // --- Collection Rules ---
@@ -65,24 +70,26 @@ service cloud.firestore {
       allow get: if isOwner(userId);
       allow create: if isOwner(userId) && isValidUserProfile(incoming());
       allow update: if isOwner(userId) && isValidUserProfile(incoming())
+        && incoming().userId == existing().userId
         && incoming().diff(existing()).affectedKeys().hasOnly(['initialBalance', 'monthlyLimit', 'currency']);
     }
 
     // Transaction Rules
     match /transactions/{transactionId} {
-      // Secure List Query: Enforces that the query MUST filter by userId
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Explicitly split read into get and list for clarity/security
+      allow list: if isVerified() && resource.data.userId == request.auth.uid;
+      allow get: if isVerified() && resource.data.userId == request.auth.uid;
       
-      allow create: if isSignedIn() 
+      allow create: if isVerified() 
         && isValidTransaction(incoming())
         && exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid));
         
-      allow update: if isSignedIn() 
+      allow update: if isVerified() 
         && existing().userId == request.auth.uid 
         && isValidTransaction(incoming())
         && incoming().userId == existing().userId; // Immutable Owner
         
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow delete: if isVerified() && existing().userId == request.auth.uid;
     }
   }
 }

@@ -62,7 +62,7 @@ import {
   Tooltip as ChartTooltip
 } from 'recharts';
 
-import { auth, db } from './lib/firebase';
+import { auth, db, handleFirestoreError } from './lib/firebase';
 import { parseTransactionScreenshot, ParsedTransaction } from './lib/gemini';
 import { cn, formatCurrency } from './lib/utils';
 import { exportToPDF, exportTransactionsToPDF } from './lib/pdfExport';
@@ -357,8 +357,11 @@ export default function App() {
         );
         onSnapshot(q, (snapshot) => {
           setTransactions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Transaction)));
-        }, (error) => {
+        }, (error: any) => {
           console.error("Transactions listener error:", error);
+          if (error.code === 'permission-denied') {
+            handleFirestoreError(error, 'list', 'transactions');
+          }
           if (error.message.includes('index')) {
             console.warn("Please check the console for a link to create the required Firestore index.");
           }
@@ -402,7 +405,12 @@ export default function App() {
         
         const batch = parsedArray.map(parsed => 
           addDoc(collection(db, 'transactions'), {
-            ...parsed,
+            amount: parsed.amount || 0,
+            type: parsed.type || 'debit',
+            category: parsed.category || 'General',
+            merchant: parsed.merchant || 'Unknown Merchant',
+            date: parsed.date || new Date().toISOString(),
+            description: parsed.description || '',
             userId: user.uid,
             createdAt: new Date().toISOString()
           })
