@@ -1,18 +1,23 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny
+    
+    // 0. Global Safety Net
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // --- Helpers ---
+    // --- 3. Primitive Definitions (Helpers) ---
     function isSignedIn() {
       return request.auth != null;
     }
     
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function incoming() {
@@ -23,32 +28,61 @@ service cloud.firestore {
       return resource.data;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    // --- Entity Validation Blueprints ---
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['userId', 'initialBalance', 'monthlyLimit', 'currency'])
+        && data.keys().size() == 4
+        && data.userId == request.auth.uid
+        && data.initialBalance is number
+        && data.monthlyLimit is number
+        && data.currency is string
+        && data.currency.size() <= 10;
     }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['userId', 'amount', 'type', 'category', 'merchant', 'date', 'description', 'createdAt'])
+        && data.keys().size() == 8
+        && data.userId == request.auth.uid
+        && data.amount is number
+        && data.type in ['credit', 'debit']
+        && data.category is string && data.category.size() <= 64
+        && data.merchant is string && data.merchant.size() <= 128
+        && data.date is string && data.date.size() <= 64
+        && data.description is string && data.description.size() <= 500
+        && data.createdAt is string; // Validated as string representation of ISO or request.time
+    }
+
+    // --- Collection Rules ---
 
     // Test Path for Connection Check
     match /test/connection {
-      allow get: if true; // Public check for availability
+      allow get: if true;
     }
 
     // User Profile Rules
     match /userProfiles/{userId} {
       allow get: if isOwner(userId);
-      allow create, update: if isOwner(userId) 
-        && incoming().userId == request.auth.uid
-        && (incoming().initialBalance is number)
-        && (incoming().monthlyLimit is number);
+      allow create: if isOwner(userId) && isValidUserProfile(incoming());
+      allow update: if isOwner(userId) && isValidUserProfile(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['initialBalance', 'monthlyLimit', 'currency']);
     }
 
     // Transaction Rules
     match /transactions/{transactionId} {
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Secure List Query: Enforces that the query MUST filter by userId
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
       allow create: if isSignedIn() 
-        && incoming().userId == request.auth.uid
-        && (incoming().amount is number);
-      allow update, delete: if isSignedIn() && existing().userId == request.auth.uid;
+        && isValidTransaction(incoming())
+        && exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid));
+        
+      allow update: if isSignedIn() 
+        && existing().userId == request.auth.uid 
+        && isValidTransaction(incoming())
+        && incoming().userId == existing().userId; // Immutable Owner
+        
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
   }
 }

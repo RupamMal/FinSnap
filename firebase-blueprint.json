@@ -1,21 +1,20 @@
 {
   "entities": {
-    "userProfile": {
+    "UserProfile": {
       "title": "User Profile",
-      "description": "Stores user budget settings and initial balance",
+      "description": "Configuration and balance info for a user",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
         "initialBalance": { "type": "number" },
         "monthlyLimit": { "type": "number" },
-        "currency": { "type": "string" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "currency": { "type": "string" }
       },
-      "required": ["userId", "initialBalance", "monthlyLimit"]
+      "required": ["userId", "initialBalance", "monthlyLimit", "currency"]
     },
-    "transaction": {
+    "Transaction": {
       "title": "Transaction",
-      "description": "Individual expense or credit record",
+      "description": "A single financial transaction",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -23,22 +22,21 @@
         "type": { "type": "string", "enum": ["credit", "debit"] },
         "category": { "type": "string" },
         "merchant": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
+        "date": { "type": "string" },
         "description": { "type": "string" },
-        "imageUrl": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "amount", "type", "category", "date"]
+      "required": ["userId", "amount", "type", "category", "merchant", "date", "createdAt"]
     }
   },
   "firestore": {
-    "userProfiles/{userId}": {
-      "schema": "userProfile",
-      "description": "Metadata for each user"
+    "/userProfiles/{userId}": {
+      "schema": "UserProfile",
+      "description": "User settings and limits"
     },
-    "transactions/{transactionId}": {
-      "schema": "transaction",
-      "description": "Collection of user transactions"
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "All financial transactions"
     }
   }
 }
